@@ -19,6 +19,32 @@ export default {
 		},
 		extend: {
 			colors: {
+				bizblue: {
+					DEFAULT: '#1A365D',
+					50: '#EEF2F7',
+					100: '#D0DBEB',
+					200: '#9CB3D8',
+					300: '#6A8AC5',
+					400: '#3F62A9',
+					500: '#2A4273',
+					600: '#1A365D',
+					700: '#132747',
+					800: '#0B1830',
+					900: '#05091A'
+				},
+				bizpurple: {
+					DEFAULT: '#4C3988',
+					50: '#F1EDF7',
+					100: '#D8CBEA',
+					200: '#B39DD6',
+					300: '#8F6FC1',
+					400: '#6B41AD',
+					500: '#4C3988',
+					600: '#3A2B67',
+					700: '#291E47',
+					800: '#171026',
+					900: '#0B0813'
+				},
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
