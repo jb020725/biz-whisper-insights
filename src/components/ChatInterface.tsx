@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, FileUp, Loader2, X, FileText } from "lucide-react";
@@ -25,6 +24,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [currentTask, setCurrentTask] = useState<AnalysisTask | null>(null);
@@ -43,12 +43,20 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Focus input when component mounts
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus();
     }
   }, []);
+
+  const handleStop = () => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+      setIsLoading(false);
+      toast.info("Processing stopped");
+    }
+  };
 
   const handleSend = async (customMessage?: string, taskType?: AnalysisTask) => {
     const messageToSend = customMessage || input.trim();
@@ -63,7 +71,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
       userContent += userContent ? `\n\nFiles: ${fileNames}` : `Files: ${fileNames}`;
     }
     
-    // Add the task type if specified
     if (taskType) {
       userContent = `[${taskType.toUpperCase()}] ${userContent}`;
     }
@@ -78,15 +85,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
     setMessages(current => [...current, newMessage]);
     setInput("");
     
-    // Call parent callback if provided
     if (onSendMessage) {
       onSendMessage(messageToSend, files);
     }
     
-    // Process message with Hugging Face API
     setIsLoading(true);
+    const controller = new AbortController();
+    setAbortController(controller);
+
     try {
-      // Use the task type if specified, otherwise use currentTask
       const task = taskType || currentTask;
       const response = await processMessage(messageToSend, files, task);
       
@@ -100,13 +107,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
         }
       ]);
       
-      // Reset current task after processing
       setCurrentTask(null);
     } catch (error) {
+      if (error.name === 'AbortError') {
+        return;
+      }
       console.error("Error processing message:", error);
       toast.error("Failed to process your message. Please try again.");
       
-      // Add error message
       setMessages(current => [
         ...current,
         {
@@ -118,6 +126,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
       ]);
     } finally {
       setIsLoading(false);
+      setAbortController(null);
       setFiles([]);
       setShowUpload(false);
     }
@@ -218,6 +227,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
         <div 
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-4"
+          style={{ height: 'calc(100% - 180px)' }}
         >
           {messages.map((message, index) => (
             <ChatMessage 
@@ -228,48 +238,48 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
           ))}
           
           {isLoading && (
-            <div className="flex items-center space-x-2 p-3 max-w-[70%] animate-pulse">
+            <div className="flex items-center space-x-2 p-3 max-w-[70%]">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Analyzing...</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleStop}
+                className="ml-2"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Stop
+              </Button>
             </div>
           )}
           
           <div ref={messageEndRef} />
         </div>
         
-        {/* File upload area */}
-        {showUpload && (
-          <div className="p-4 border-t bg-muted/30">
-            <FileUpload onFilesSelected={handleFileSelected} />
-          </div>
-        )}
-        
-        {/* Suggested queries for first-time users */}
-        {messages.length === 1 && (
-          <div className="p-4 border-t">
-            <p className="text-sm text-muted-foreground mb-3">Try asking:</p>
-            <div className="flex flex-wrap gap-2">
-              {suggestedQueries.map((query, i) => (
-                <button
-                  key={i}
-                  className="bg-bizpurple-50 hover:bg-bizpurple-100 text-bizpurple-700 text-sm py-1 px-3 rounded-full border border-bizpurple-200"
-                  onClick={() => setInput(query)}
-                >
-                  {query}
-                </button>
+        <div className="border-t bg-white p-4 sticky bottom-0 left-0 right-0">
+          {files.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {files.map((file, idx) => (
+                <div key={idx} className="inline-flex items-center gap-1 bg-muted px-2 py-1 rounded-md text-xs">
+                  <FileText className="h-3 w-3" />
+                  {file.name}
+                  <button 
+                    onClick={() => setFiles(files.filter((_, i) => i !== idx))}
+                    className="ml-1 hover:bg-muted-foreground/20 rounded-full p-1"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
               ))}
             </div>
-          </div>
-        )}
-        
-        {/* Chat input */}
-        <div className="border-t bg-white p-4 relative">
+          )}
+
           <div className="flex items-end gap-2 max-w-4xl mx-auto">
             <Button
               type="button"
               size="icon"
               variant="outline"
-              className="flex-shrink-0"
+              className={`flex-shrink-0 ${showUpload ? 'bg-muted' : ''}`}
               onClick={() => setShowUpload(!showUpload)}
             >
               <FileUp className="h-5 w-5" />
@@ -278,19 +288,24 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
             <div className="relative flex-1">
               <textarea
                 ref={inputRef}
-                className="w-full border rounded-lg pl-4 pr-12 py-3 resize-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:outline-none min-h-[52px]"
-                rows={1}
+                className="w-full border rounded-lg pl-4 pr-12 py-3 resize-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:outline-none"
                 placeholder={currentTask 
                   ? `${currentTask.charAt(0).toUpperCase() + currentTask.slice(1)} this document...` 
                   : "Ask a question or upload a document for analysis..."
                 }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyPress}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                rows={1}
                 style={{ 
-                  height: input.split('\n').length > 3 ? 'auto' : '52px',
-                  maxHeight: '150px',
-                  minHeight: '52px'
+                  height: 'auto',
+                  minHeight: '52px',
+                  maxHeight: '150px'
                 }}
               />
               <Button
@@ -305,29 +320,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
             </div>
           </div>
           
-          {/* Display selected files */}
-          {files.length > 0 && (
-            <div className="mt-2 max-w-4xl mx-auto">
-              <p className="text-xs text-muted-foreground mb-1">Selected files:</p>
-              <div className="flex flex-wrap gap-2">
-                {files.map((file, idx) => (
-                  <div key={idx} className="text-xs bg-muted flex items-center gap-1 px-2 py-1 rounded-md">
-                    <FileText className="h-3 w-3" />
-                    {file.name}
-                    <button 
-                      onClick={() => setFiles(files.filter((_, i) => i !== idx))}
-                      className="ml-1 text-gray-500 hover:text-gray-700"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+          {showUpload && (
+            <div className="mt-4">
+              <FileUpload onFilesSelected={handleFileSelected} />
             </div>
           )}
-          
+
           {currentTask && (
-            <div className="mt-2 max-w-4xl mx-auto">
+            <div className="mt-2">
               <div className="text-xs flex items-center gap-1 text-bizpurple-700 bg-bizpurple-50 px-2 py-1 rounded-full inline-block">
                 <span>
                   {currentTask === 'review' && '📄 Review mode'}

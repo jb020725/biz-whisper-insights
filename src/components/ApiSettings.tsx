@@ -11,8 +11,7 @@ interface ApiSettingsProps {
 }
 
 const ApiSettings: React.FC<ApiSettingsProps> = ({ onClose }) => {
-  const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("mistralai/Mixtral-8x7B-Instruct-v0.1");
+  const [apiKey, setApiKey] = useState("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");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSave = () => {
@@ -24,9 +23,7 @@ const ApiSettings: React.FC<ApiSettingsProps> = ({ onClose }) => {
     setIsLoading(true);
     try {
       configureHuggingFace(apiKey, {
-        main: model,
-        summarization: "facebook/bart-large-cnn",
-        backup: "tiiuae/falcon-7b-instruct"
+        main: "mistralai/Mixtral-8x7B-Instruct-v0.1"
       });
       toast.success("API settings saved successfully");
       onClose();
@@ -52,20 +49,6 @@ const ApiSettings: React.FC<ApiSettingsProps> = ({ onClose }) => {
         />
         <p className="text-xs text-muted-foreground">
           You can find your API key in your HuggingFace account settings
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="model">Main Model</Label>
-        <Input
-          id="model"
-          type="text"
-          placeholder="Enter model name"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-        />
-        <p className="text-xs text-muted-foreground">
-          Default: mistralai/Mixtral-8x7B-Instruct-v0.1
         </p>
       </div>
 
