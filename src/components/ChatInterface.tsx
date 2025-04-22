@@ -1,18 +1,20 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Send, Paperclip, Settings, Loader2 } from "lucide-react";
+import { Send, FileUp, Loader2, X, FileText, ChevronDown } from "lucide-react";
 import ChatMessage, { MessageType } from "./ChatMessage";
 import FileUpload from "./FileUpload";
 import { v4 as uuidv4 } from "uuid";
 import { processMessage } from "@/services/huggingfaceService";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import ApiSettings from "./ApiSettings";
+import { useAuth } from "@/contexts/AuthContext";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 interface ChatInterfaceProps {
   onSendMessage?: (message: string, files?: File[]) => void;
 }
+
+type AnalysisTask = 'review' | 'summarize' | 'insights' | 'solutions';
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) => {
   const [input, setInput] = useState("");
@@ -20,32 +22,53 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
     {
       id: "welcome-message",
       type: "assistant",
-      content: "Hello! I'm your business insights assistant. You can upload business documents, reports, or problem statements, and I'll help you analyze them. How can I assist you today?",
+      content: "Hello! I'm your business AI assistant. You can upload business documents, reports, or problem statements, and I'll help you analyze them. How can I assist you today?",
       timestamp: new Date(),
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
-  const [apiConfigured, setApiConfigured] = useState(false);
+  const [currentTask, setCurrentTask] = useState<AnalysisTask | null>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const { isAuthenticated } = useAuth();
 
   const suggestedQueries = [
     "Summarize this financial report",
-    "Analyze the key trends in this data",
-    "Identify business opportunities from this market analysis",
-    "Explain the main challenges described in this document"
+    "Identify challenges in this business plan",
+    "Generate insights from this case study",
+    "Provide a strategy to solve the described issue"
   ];
 
-  const handleSend = async () => {
-    if (input.trim() === "" && files.length === 0) return;
+  useEffect(() => {
+    messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Focus input when component mounts
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  const handleSend = async (customMessage?: string, taskType?: AnalysisTask) => {
+    const messageToSend = customMessage || input.trim();
     
+    if (messageToSend === "" && files.length === 0) return;
+
     // Create user message
-    let userContent = input.trim();
+    let userContent = messageToSend;
     
     if (files.length > 0) {
       const fileNames = files.map(file => file.name).join(", ");
       userContent += userContent ? `\n\nFiles: ${fileNames}` : `Files: ${fileNames}`;
+    }
+    
+    // Add the task type if specified
+    if (taskType) {
+      userContent = `[${taskType.toUpperCase()}] ${userContent}`;
     }
     
     const newMessage: MessageType = {
@@ -60,13 +83,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
     
     // Call parent callback if provided
     if (onSendMessage) {
-      onSendMessage(input, files);
+      onSendMessage(messageToSend, files);
     }
     
-    // Process message with HuggingFace API
+    // Process message with Hugging Face API
     setIsLoading(true);
     try {
-      const response = await processMessage(input, files);
+      // Use the task type if specified, otherwise use currentTask
+      const task = taskType || currentTask;
+      const response = await processMessage(messageToSend, files, task);
       
       setMessages(current => [
         ...current,
@@ -77,6 +102,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
           timestamp: new Date()
         }
       ]);
+      
+      // Reset current task after processing
+      setCurrentTask(null);
     } catch (error) {
       console.error("Error processing message:", error);
       toast.error("Failed to process your message. Please try again.");
@@ -87,7 +115,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
         {
           id: uuidv4(),
           type: "assistant",
-          content: "I'm sorry, I wasn't able to process your request. Please check your API settings and try again.",
+          content: "I'm sorry, I wasn't able to process your request. Please make sure the Hugging Face API is properly configured.",
           timestamp: new Date()
         }
       ]);
@@ -95,6 +123,41 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
       setIsLoading(false);
       setFiles([]);
       setShowUpload(false);
+    }
+  };
+
+  const handleTaskClick = (task: AnalysisTask) => {
+    setCurrentTask(task);
+    
+    let promptText = "";
+    switch (task) {
+      case 'review':
+        promptText = files.length > 0 
+          ? `Please review the attached document${files.length > 1 ? 's' : ''}.` 
+          : "Please upload a document for me to review.";
+        break;
+      case 'summarize':
+        promptText = files.length > 0 
+          ? `Please summarize the attached document${files.length > 1 ? 's' : ''}.` 
+          : "Please upload a document for me to summarize.";
+        break;
+      case 'insights':
+        promptText = files.length > 0 
+          ? `Please provide key insights from the attached document${files.length > 1 ? 's' : ''}.` 
+          : "Please upload a document to extract insights from.";
+        break;
+      case 'solutions':
+        promptText = files.length > 0 
+          ? `Please generate a solution based on the attached document${files.length > 1 ? 's' : ''}.` 
+          : "Please upload a document for me to generate solutions for.";
+        break;
+    }
+    
+    if (files.length > 0) {
+      handleSend(promptText, task);
+    } else {
+      setShowUpload(true);
+      setInput(promptText);
     }
   };
 
@@ -109,136 +172,179 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
     setFiles(selectedFiles);
   };
 
-  const handleApiSettingsSaved = () => {
-    setApiConfigured(true);
-  };
-
-  // Auto scroll to bottom on new messages
-  useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   return (
-    <div className="flex flex-col h-full bg-white border rounded-lg shadow-sm overflow-hidden">
-      {/* Chat header */}
-      <div className="p-4 border-b flex items-center justify-between bg-white">
-        <div className="flex items-center">
-          <div>
-            <h3 className="font-medium text-sm">BizWhisper Assistant</h3>
-            <p className="text-xs text-muted-foreground">Business insights AI</p>
-          </div>
-        </div>
-        
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4 mr-2" />
-              API Settings
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <ApiSettings onClose={handleApiSettingsSaved} />
-          </DialogContent>
-        </Dialog>
+    <div className="flex flex-col h-full bg-white overflow-hidden">
+      {/* Inspirational quote */}
+      <div className="bg-gradient-to-r from-bizpurple-50 to-bizblue-50 py-2 px-4 text-center text-sm text-gray-600 border-b">
+        AI trained on the greatest business minds. Get insights from business geniuses.
       </div>
       
-      {/* Chat messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message, index) => (
-          <ChatMessage 
-            key={message.id} 
-            message={message} 
-            isLastMessage={index === messages.length - 1}
-          />
-        ))}
+      {/* Chat container */}
+      <div className="flex flex-col h-full">
+        {/* Feature buttons */}
+        <div className="bg-white border-b py-3 px-4 flex items-center justify-center space-x-2 md:space-x-4">
+          <Button 
+            onClick={() => handleTaskClick('review')}
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-xs md:text-sm"
+          >
+            📄 Review
+          </Button>
+          <Button 
+            onClick={() => handleTaskClick('summarize')}
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-xs md:text-sm"
+          >
+            ✂️ Summarize
+          </Button>
+          <Button 
+            onClick={() => handleTaskClick('insights')}
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-xs md:text-sm"
+          >
+            📊 Extract Insights
+          </Button>
+          <Button 
+            onClick={() => handleTaskClick('solutions')}
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-xs md:text-sm"
+          >
+            🧠 Generate Solutions
+          </Button>
+        </div>
         
-        {isLoading && (
-          <div className="flex items-center space-x-2 p-3 max-w-[70%]">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Analyzing...</span>
+        {/* Chat messages */}
+        <div 
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto p-4 space-y-4"
+        >
+          {messages.map((message, index) => (
+            <ChatMessage 
+              key={message.id} 
+              message={message} 
+              isLastMessage={index === messages.length - 1}
+            />
+          ))}
+          
+          {isLoading && (
+            <div className="flex items-center space-x-2 p-3 max-w-[70%] animate-pulse">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Analyzing...</span>
+            </div>
+          )}
+          
+          <div ref={messageEndRef} />
+        </div>
+        
+        {/* File upload area */}
+        {showUpload && (
+          <div className="p-4 border-t bg-muted/30">
+            <FileUpload onFilesSelected={handleFileSelected} />
           </div>
         )}
         
-        <div ref={messageEndRef} />
-      </div>
-      
-      {/* Suggested queries */}
-      {messages.length === 1 && (
-        <div className="p-4 border-t">
-          <p className="text-sm text-muted-foreground mb-3">Try asking:</p>
-          <div className="flex flex-wrap gap-2">
-            {suggestedQueries.map((query, i) => (
-              <button
-                key={i}
-                className="bg-bizpurple-50 hover:bg-bizpurple-100 text-bizpurple-700 text-sm py-1 px-3 rounded-full border border-bizpurple-200"
-                onClick={() => setInput(query)}
-              >
-                {query}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      
-      {/* File upload area */}
-      {showUpload && (
-        <div className="p-4 border-t bg-muted/30">
-          <FileUpload onFilesSelected={handleFileSelected} />
-        </div>
-      )}
-      
-      {/* Chat input */}
-      <div className="p-4 border-t bg-white">
-        <div className="flex items-end space-x-2">
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            className="flex-shrink-0"
-            onClick={() => setShowUpload(!showUpload)}
-          >
-            <Paperclip className="h-5 w-5" />
-          </Button>
-          
-          <div className="relative flex-1">
-            <textarea
-              className="w-full border rounded-lg pl-4 pr-12 py-3 resize-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:outline-none"
-              rows={1}
-              placeholder="Ask a question or upload a document..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyPress}
-              style={{ 
-                height: input.split('\n').length > 3 ? 'auto' : '44px',
-                maxHeight: '150px',
-                minHeight: '44px'
-              }}
-            />
-            <Button
-              className="absolute right-1 bottom-1 h-8 w-8 p-0"
-              type="button"
-              size="icon"
-              onClick={handleSend}
-              disabled={isLoading || (input.trim() === "" && files.length === 0)}
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-        
-        {/* Display selected files */}
-        {files.length > 0 && (
-          <div className="mt-2">
-            <p className="text-xs text-muted-foreground mb-1">Selected files:</p>
+        {/* Suggested queries for first-time users */}
+        {messages.length === 1 && (
+          <div className="p-4 border-t">
+            <p className="text-sm text-muted-foreground mb-3">Try asking:</p>
             <div className="flex flex-wrap gap-2">
-              {files.map((file, idx) => (
-                <div key={idx} className="text-xs bg-muted px-2 py-1 rounded-md">
-                  {file.name}
-                </div>
+              {suggestedQueries.map((query, i) => (
+                <button
+                  key={i}
+                  className="bg-bizpurple-50 hover:bg-bizpurple-100 text-bizpurple-700 text-sm py-1 px-3 rounded-full border border-bizpurple-200"
+                  onClick={() => setInput(query)}
+                >
+                  {query}
+                </button>
               ))}
             </div>
           </div>
         )}
+        
+        {/* Chat input */}
+        <div className="border-t bg-white p-4 relative">
+          <div className="flex items-end gap-2 max-w-4xl mx-auto">
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="flex-shrink-0"
+              onClick={() => setShowUpload(!showUpload)}
+            >
+              <FileUp className="h-5 w-5" />
+            </Button>
+            
+            <div className="relative flex-1">
+              <textarea
+                ref={inputRef}
+                className="w-full border rounded-lg pl-4 pr-12 py-3 resize-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:outline-none min-h-[52px]"
+                rows={1}
+                placeholder={currentTask 
+                  ? `${currentTask.charAt(0).toUpperCase() + currentTask.slice(1)} this document...` 
+                  : "Ask a question or upload a document for analysis..."
+                }
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyPress}
+                style={{ 
+                  height: input.split('\n').length > 3 ? 'auto' : '52px',
+                  maxHeight: '150px',
+                  minHeight: '52px'
+                }}
+              />
+              <Button
+                className="absolute right-2 bottom-2 h-9 w-9 p-0"
+                type="button"
+                size="icon"
+                onClick={() => handleSend()}
+                disabled={isLoading || (input.trim() === "" && files.length === 0)}
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          
+          {/* Display selected files */}
+          {files.length > 0 && (
+            <div className="mt-2 max-w-4xl mx-auto">
+              <p className="text-xs text-muted-foreground mb-1">Selected files:</p>
+              <div className="flex flex-wrap gap-2">
+                {files.map((file, idx) => (
+                  <div key={idx} className="text-xs bg-muted flex items-center gap-1 px-2 py-1 rounded-md">
+                    <FileText className="h-3 w-3" />
+                    {file.name}
+                    <button 
+                      onClick={() => setFiles(files.filter((_, i) => i !== idx))}
+                      className="ml-1 text-gray-500 hover:text-gray-700"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {currentTask && (
+            <div className="mt-2 max-w-4xl mx-auto">
+              <div className="text-xs flex items-center gap-1 text-bizpurple-700 bg-bizpurple-50 px-2 py-1 rounded-full inline-block">
+                <span>
+                  {currentTask === 'review' && '📄 Review mode'}
+                  {currentTask === 'summarize' && '✂️ Summarize mode'}
+                  {currentTask === 'insights' && '📊 Insights mode'}
+                  {currentTask === 'solutions' && '🧠 Solutions mode'}
+                </span>
+                <button onClick={() => setCurrentTask(null)}>
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, File, X } from "lucide-react";
+import { FileUp, FileText, X } from "lucide-react";
 
 interface FileUploadProps {
   onFilesSelected: (files: File[]) => void;
@@ -45,12 +45,20 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected }) => {
       file.type === "application/msword"
     );
     
-    setSelectedFiles(prev => [...prev, ...validFiles]);
-    onFilesSelected(validFiles);
+    if (validFiles.length < files.length) {
+      // Alert user about invalid files
+      alert("Some files were not accepted. Please upload only PDF, Word, or text files.");
+    }
+    
+    const newFiles = [...selectedFiles, ...validFiles];
+    setSelectedFiles(newFiles);
+    onFilesSelected(newFiles);
   };
 
   const removeFile = (index: number) => {
-    setSelectedFiles(files => files.filter((_, i) => i !== index));
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    setSelectedFiles(newFiles);
+    onFilesSelected(newFiles);
   };
 
   return (
@@ -65,8 +73,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected }) => {
         onDrop={handleDrop}
         onClick={() => document.getElementById('file-upload')?.click()}
       >
-        <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-        <p className="text-sm font-medium mb-1">Drag and drop files or click to browse</p>
+        <FileUp className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+        <p className="text-sm font-medium mb-1">Drag and drop business documents or click to browse</p>
         <p className="text-xs text-muted-foreground mb-2">
           Upload PDF, Word, or text files (max 25MB)
         </p>
@@ -90,7 +98,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected }) => {
             {selectedFiles.map((file, index) => (
               <div key={index} className="flex items-center justify-between bg-muted rounded-md p-2">
                 <div className="flex items-center">
-                  <File className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
                   <span className="text-sm truncate max-w-[250px]">{file.name}</span>
                 </div>
                 <button 
