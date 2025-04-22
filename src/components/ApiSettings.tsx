@@ -23,7 +23,11 @@ const ApiSettings: React.FC<ApiSettingsProps> = ({ onClose }) => {
 
     setIsLoading(true);
     try {
-      configureHuggingFace(apiKey, model);
+      configureHuggingFace(apiKey, {
+        main: model,
+        summarization: "facebook/bart-large-cnn",
+        backup: "tiiuae/falcon-7b-instruct"
+      });
       toast.success("API settings saved successfully");
       onClose();
     } catch (error) {
@@ -52,7 +56,7 @@ const ApiSettings: React.FC<ApiSettingsProps> = ({ onClose }) => {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="model">Model</Label>
+        <Label htmlFor="model">Main Model</Label>
         <Input
           id="model"
           type="text"
