@@ -1,13 +1,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Send, FileUp, Loader2, X, FileText, ChevronDown } from "lucide-react";
+import { Send, FileUp, Loader2, X, FileText } from "lucide-react";
 import ChatMessage, { MessageType } from "./ChatMessage";
 import FileUpload from "./FileUpload";
 import { v4 as uuidv4 } from "uuid";
 import { processMessage } from "@/services/huggingfaceService";
-import { useAuth } from "@/contexts/AuthContext";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 interface ChatInterfaceProps {
@@ -33,13 +31,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
   const messageEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const { isAuthenticated } = useAuth();
 
   const suggestedQueries = [
-    "Summarize this financial report",
-    "Identify challenges in this business plan",
-    "Generate insights from this case study",
-    "Provide a strategy to solve the described issue"
+    "Get your business problem solved",
+    "Summarize this report",
+    "Generate a solution from this document",
+    "Extract insights from this business plan"
   ];
 
   useEffect(() => {
@@ -115,7 +112,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
         {
           id: uuidv4(),
           type: "assistant",
-          content: "I'm sorry, I wasn't able to process your request. Please make sure the Hugging Face API is properly configured.",
+          content: "I'm sorry, I wasn't able to process your request. Please try again.",
           timestamp: new Date()
         }
       ]);

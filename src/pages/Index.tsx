@@ -99,7 +99,6 @@ const Index = () => {
               Start Your Free Trial
             </Button>
           </div>
-          
         </div>
       </main>
       <Footer />
