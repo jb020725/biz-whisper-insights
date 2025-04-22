@@ -1,10 +1,14 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Send, Paperclip, Bot, Loader2 } from "lucide-react";
+import { Send, Paperclip, Settings, Loader2 } from "lucide-react";
 import ChatMessage, { MessageType } from "./ChatMessage";
 import FileUpload from "./FileUpload";
-import { v4 as uuidv4 } from "uuid"; // Note: We'll add this dependency after
+import { v4 as uuidv4 } from "uuid";
+import { processMessage } from "@/services/huggingfaceService";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import ApiSettings from "./ApiSettings";
+import { toast } from "sonner";
 
 interface ChatInterfaceProps {
   onSendMessage?: (message: string, files?: File[]) => void;
@@ -23,6 +27,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
   const [isLoading, setIsLoading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [apiConfigured, setApiConfigured] = useState(false);
   const messageEndRef = useRef<HTMLDivElement>(null);
 
   const suggestedQueries = [
@@ -32,36 +37,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
     "Explain the main challenges described in this document"
   ];
 
-  // Simulate AI response to user messages
-  const simulateResponse = (userMessage: string) => {
-    setIsLoading(true);
-    
-    // Simulate thinking time
-    setTimeout(() => {
-      const responses = [
-        "Based on my analysis, the document shows several key insights. First, there's a noticeable trend in market growth within the specified sector. The financial data indicates a 15% increase in revenue opportunities, while highlighting challenges in supply chain optimization.",
-        "Looking at this business report, I can identify three main areas of concern: customer acquisition costs are rising, retention rates are falling below industry average, and your competitive advantage is being eroded by new market entrants.",
-        "The problem statement you've shared identifies inefficiencies in your current workflow. I'd recommend focusing on automating repetitive tasks, improving cross-department communication, and implementing a data-driven decision framework.",
-        "From the financial analysis you've uploaded, I can see that your profit margins are healthy but cash flow remains a concern. Consider optimizing your accounts receivable process and renegotiating payment terms with suppliers."
-      ];
-      
-      const responseIndex = Math.floor(Math.random() * responses.length);
-      
-      setMessages(current => [
-        ...current, 
-        {
-          id: uuidv4(),
-          type: "assistant",
-          content: responses[responseIndex],
-          timestamp: new Date()
-        }
-      ]);
-      
-      setIsLoading(false);
-    }, 2000);
-  };
-
-  const handleSend = () => {
+  const handleSend = async () => {
     if (input.trim() === "" && files.length === 0) return;
     
     // Create user message
@@ -81,16 +57,45 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
     
     setMessages(current => [...current, newMessage]);
     setInput("");
-    setFiles([]);
-    setShowUpload(false);
     
     // Call parent callback if provided
     if (onSendMessage) {
       onSendMessage(input, files);
     }
     
-    // Simulate response for demo purposes
-    simulateResponse(input);
+    // Process message with HuggingFace API
+    setIsLoading(true);
+    try {
+      const response = await processMessage(input, files);
+      
+      setMessages(current => [
+        ...current,
+        {
+          id: uuidv4(),
+          type: "assistant",
+          content: response,
+          timestamp: new Date()
+        }
+      ]);
+    } catch (error) {
+      console.error("Error processing message:", error);
+      toast.error("Failed to process your message. Please try again.");
+      
+      // Add error message
+      setMessages(current => [
+        ...current,
+        {
+          id: uuidv4(),
+          type: "assistant",
+          content: "I'm sorry, I wasn't able to process your request. Please check your API settings and try again.",
+          timestamp: new Date()
+        }
+      ]);
+    } finally {
+      setIsLoading(false);
+      setFiles([]);
+      setShowUpload(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -104,6 +109,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
     setFiles(selectedFiles);
   };
 
+  const handleApiSettingsSaved = () => {
+    setApiConfigured(true);
+  };
+
   // Auto scroll to bottom on new messages
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -114,14 +123,23 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
       {/* Chat header */}
       <div className="p-4 border-b flex items-center justify-between bg-white">
         <div className="flex items-center">
-          <div className="bg-bizpurple-100 p-2 rounded-full mr-3">
-            <Bot className="h-5 w-5 text-bizpurple-500" />
-          </div>
           <div>
             <h3 className="font-medium text-sm">BizWhisper Assistant</h3>
             <p className="text-xs text-muted-foreground">Business insights AI</p>
           </div>
         </div>
+        
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Settings className="h-4 w-4 mr-2" />
+              API Settings
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <ApiSettings onClose={handleApiSettingsSaved} />
+          </DialogContent>
+        </Dialog>
       </div>
       
       {/* Chat messages */}

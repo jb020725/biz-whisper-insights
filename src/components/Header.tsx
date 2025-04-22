@@ -24,24 +24,20 @@ export const Header = () => {
           <Link to="/" className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground">
             Home
           </Link>
-          <Link to="/features" className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground">
-            Features
-          </Link>
-          <Link to="/pricing" className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground">
-            Pricing
-          </Link>
-          <Link to="/about" className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground">
-            About
+          <Link to="/chat" className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground">
+            Chat
           </Link>
         </nav>
         
         <div className="hidden md:flex items-center gap-4">
-          <Button variant="ghost" size="sm">
-            Sign In
-          </Button>
-          <Link to="/chat">
+          <Link to="/login">
+            <Button variant="ghost" size="sm">
+              Sign In
+            </Button>
+          </Link>
+          <Link to="/signup">
             <Button variant="default" size="sm" className="bg-gradient-to-r from-bizpurple-500 to-bizblue-500 hover:from-bizpurple-600 hover:to-bizblue-600">
-              Get Started
+              Sign Up
             </Button>
           </Link>
         </div>
@@ -67,33 +63,23 @@ export const Header = () => {
               Home
             </Link>
             <Link 
-              to="/features" 
+              to="/chat" 
               className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground py-2"
               onClick={() => setIsMenuOpen(false)}
             >
-              Features
-            </Link>
-            <Link 
-              to="/pricing" 
-              className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground py-2"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Pricing
-            </Link>
-            <Link 
-              to="/about" 
-              className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground py-2"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              About
+              Chat
             </Link>
             <div className="pt-2 flex flex-col space-y-2">
-              <Button variant="ghost" size="sm">
-                Sign In
-              </Button>
-              <Button variant="default" size="sm" className="bg-gradient-to-r from-bizpurple-500 to-bizblue-500 hover:from-bizpurple-600 hover:to-bizblue-600">
-                Get Started
-              </Button>
+              <Link to="/login" onClick={() => setIsMenuOpen(false)}>
+                <Button variant="ghost" size="sm" className="w-full">
+                  Sign In
+                </Button>
+              </Link>
+              <Link to="/signup" onClick={() => setIsMenuOpen(false)}>
+                <Button variant="default" size="sm" className="w-full bg-gradient-to-r from-bizpurple-500 to-bizblue-500 hover:from-bizpurple-600 hover:to-bizblue-600">
+                  Sign Up
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
